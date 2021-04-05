@@ -47,10 +47,10 @@ cd转到lab目录
 `make`  
 得到obj/kern/kernel.img则成功，已经准备好运行qemu  
 执行`make qemu`或者`make qemu-nox`，可能需要root权限    
-前者输出图形窗口，需要安装图形界面。普通用户远程ssh登陆操作时注意加上sudo来获得正常窗口输出    
+前者输出图形窗口，需要图形界面。在普通用户远程ssh登陆操作的情况下，注意搭配Xmanager类型的软件加上sudo来获得正常窗口输出    
 ![qemustart](https://user-images.githubusercontent.com/75117698/113529666-9806ad80-95f6-11eb-9842-fe2061327209.png)
 
-后者则直接输出在终端，显示如下  
+后者则直接输出在终端,适合ssh方式登陆操作，显示如下  
 ```
 Booting from Hard Disk...
 6828 decimal is XXX octal!
