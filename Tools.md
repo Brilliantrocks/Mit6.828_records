@@ -46,8 +46,8 @@ cd转到lab目录
 执行make
 `make`  
 得到obj/kern/kernel.img则成功，已经准备好运行qemu  
-`make qemu`或者`make qemu-nox`  
-前者输出图形窗口，需要安装图形界面  
+执行`make qemu`或者`make qemu-nox`，可能需要root权限    
+前者输出图形窗口，需要安装图形界面。普通用户远程ssh登陆操作时注意加上sudo来获得正常窗口输出    
 后者则直接输出在终端，显示如下  
 ```
 Booting from Hard Disk...
