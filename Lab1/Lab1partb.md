@@ -313,4 +313,284 @@ readsect(void *dst, uint32_t offset)
 > + Q3 内核的第一条指令在哪里？ 
   位于/kern/entry.S文件中。
 > + Q4 boot loader是如何知道它要读取多少个扇区才能把整个内核都送入内存的呢？在哪里找到这些信息？
-  首先关于操作系统一共有多少个段，每个段又有多少个扇区的信息位于操作系统文件中的Program Header Table中。这个表中的每个表项分别对应操作系统的一个段。并且每个表项的内容包括这个段的大小，段起始地址偏移等等信息。所以如果我们能够找到这个表，那么就能够通过表项所提供的信息来确定内核占用多少个扇区。那么关于这个表存放在哪里的信息，则是存放在操作系统内核映像文件的ELF头部信息中。
+  首先关于操作系统一共有多少个段，每个段又有多少个扇区的信息位于操作系统文件中的Program Header Table中。这个表中的每个表项分别对应操作系统的一个段。并且每个表项的内容包括这个段的大小，段起始地址偏移等等信息。所以如果我们能够找到这个表，那么就能够通过表项所提供的信息来确定内核占用多少个扇区。那么关于这个表存放在哪里的信息，则是存放在操作系统内核映像文件的ELF头部信息中。  
+  
+### 加载内核
+之后将进入启动加载器的C语言部分，在文件boot/main.c中。在此之前，课程推荐停下来复习有关C语言编程的基础。  
+#### Exercise 4
+阅读有关C语言中用指针编程的资料，Mit推荐《The C Programming Language》,Brian Kernighan and Dennis Ritchie著。  
+详读资料，下载[pointers.c](https://pdos.csail.mit.edu/6.828/2018/labs/lab1/pointers.c)并运行，确保自己理解所有打印的值从何而来。具体地说，是理解行1，6的指针地址从何而来，所有打印在行2-4的值是如何到达这里的，还有为何行5打印的值看起来被破坏了。  
+
+```
+1: a = 000000000061FDC0, b = 0000000000A61400, c = 0000000000000010
+2: a[0] = 200, a[1] = 101, a[2] = 102, a[3] = 103
+3: a[0] = 200, a[1] = 300, a[2] = 301, a[3] = 302
+4: a[0] = 200, a[1] = 400, a[2] = 301, a[3] = 302
+5: a[0] = 200, a[1] = 128144, a[2] = 256, a[3] = 302
+6: a = 000000000061FDC0, b = 000000000061FDC4, c = 000000000061FDC1
+```
+  
+为了完全理解boot/main.c需要知道ELF二进制文件是什么。当你编译链接一个像JOS内核语言一样的C程序，编译器转换每个C源文件(.c)到一个object('.o'）文件,其中包含着的硬件能够读取的的汇编指令转编的二进制码。链接器之后整合所有的编译object文件到一个二进制映射文件中，如obj/kern/kernel。在这里是一个ELF格式的二进制文件，代表可执行和链接格式（Executable and Linkable Format)。  
+ELF的完整信息见[the ELF specification](https://pdos.csail.mit.edu/6.828/2018/readings/elf.pdf),但这节课不必深入了解其细节。尽管总的来说这个格式相当强大而复杂，但它其中大部分复杂的部分是为了支持共享库的动态加载，而不是这节课要做的。  
+为了完成课题，你可以把ELF可执行理解为附有加载信息，跟着数个相邻的代码块或者要被加载进内存指定地址中的数据块的程序分段的标头。启动加载器不会修改代码或数据，只会把它们加载进内存并执行。  
+一个ELF二进制文件从一个固定长度的ELF标头开始，后面是一个列出所有要被加载的程序分段的可变长程序标头。这些ELF标头的C定义在inc/elf.h中。我们需要关心的程序分段有：  
+> + .text:程序可执行指令
+> + .rodata:只读数据，如C编译器产生的ASCII字符常量。（然而我们不会麻烦地设置硬件来禁止写操作。）
+> + .data:这个数据分段保有程序地初始化数据，如像`int x = 5`这样声明地全局变量。  
+  
+当链接器处理一个程序地内存分布时，它会为未初始化的全局变量预留空间，如内存中紧跟着.data的一个叫.bss的分段里的`int x`。C语言要求未初始化的全局变量有一个初始值0，因此就没必要在ELF二进制文件中为.bss存储内容；取而代之的是，链接器只是记录.bss分段的地址和大小。加载器或者程序自身必须安排.bss分段置零。  
+检查附有内核中所有分段的名字大小和链接地址完整列表的指令：  
+`objdump -h obj/kern/kernel`  
+输出  
+```
+obj/kern/kernel:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         000019e9  f0100000  00100000  00001000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .rodata       000006c0  f0101a00  00101a00  00002a00  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  2 .stab         00003b95  f01020c0  001020c0  000030c0  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  3 .stabstr      00001948  f0105c55  00105c55  00006c55  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  4 .data         00009300  f0108000  00108000  00009000  2**12
+                  CONTENTS, ALLOC, LOAD, DATA
+  5 .got          00000008  f0111300  00111300  00012300  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  6 .got.plt      0000000c  f0111308  00111308  00012308  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  7 .data.rel.local 00001000  f0112000  00112000  00013000  2**12
+                  CONTENTS, ALLOC, LOAD, DATA
+  8 .data.rel.ro.local 00000044  f0113000  00113000  00014000  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .bss          00000648  f0113060  00113060  00014060  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .comment      00000029  00000000  00000000  000146a8  2**0
+                  CONTENTS, READONLY
+```
+有很多没有被列出来的分段，但对课题不是那么重要。大部分其他分段是存放debug信息的，一般都被包含在程序的可执行文件里但不会被程序加载器加载到内存中。  
+注意.text分段里的VMA（link address)和LMA(load address)。一个分段的加载地址是这个分段应该被加载在内存中的地址。  
+一个分段的链接地址是整个分段应该从何处被执行的地址。链接器用数种方式将链接地址编码成二进制，例如当代码需要一个全局变量的地址时，如果它不是从它被链接的地方执行的，其二进制码就不会起效。（生成没有这些绝对地址的位置无关的代码是可能的。这通常在现代共享库中大量使用，但它是以运行效率和复杂度为代价的，所以课题不会使用这种技术。）  
+通常，链接和加载地址是一样的，例如，检查启动加载器中的.text分段：
+`objdump -h obj/boot/boot.out`    
+输出  
+```
+obj/boot/boot.out:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000186  00007c00  00007c00  00000074  2**2
+                  CONTENTS, ALLOC, LOAD, CODE
+  1 .eh_frame     000000a8  00007d88  00007d88  000001fc  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  2 .stab         0000087c  00000000  00000000  000002a4  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  3 .stabstr      00000925  00000000  00000000  00000b20  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  4 .comment      00000029  00000000  00000000  00001445  2**0
+                  CONTENTS, READONLY
+```
+启动加载器使用ELF程序标头来决定如何加载分段，程序标头详述了ELF对象的那一部分要被加载进内存和因该占据的目标地址。检查程序标头指令：  
+`objdump -x obj/kern/kernel`  
+
+输出  
+```
+obj/kern/kernel:     file format elf32-i386
+obj/kern/kernel
+architecture: i386, flags 0x00000112:
+EXEC_P, HAS_SYMS, D_PAGED
+start address 0x0010000c
+
+Program Header:
+    LOAD off    0x00001000 vaddr 0xf0100000 paddr 0x00100000 align 2**12
+         filesz 0x0000759d memsz 0x0000759d flags r-x
+    LOAD off    0x00009000 vaddr 0xf0108000 paddr 0x00108000 align 2**12
+         filesz 0x0000b6a8 memsz 0x0000b6a8 flags rw-
+   STACK off    0x00000000 vaddr 0x00000000 paddr 0x00000000 align 2**4
+         filesz 0x00000000 memsz 0x00000000 flags rwx
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         000019e9  f0100000  00100000  00001000  2**4
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .rodata       000006c0  f0101a00  00101a00  00002a00  2**5
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  2 .stab         00003b95  f01020c0  001020c0  000030c0  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  3 .stabstr      00001948  f0105c55  00105c55  00006c55  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  4 .data         00009300  f0108000  00108000  00009000  2**12
+                  CONTENTS, ALLOC, LOAD, DATA
+  5 .got          00000008  f0111300  00111300  00012300  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  6 .got.plt      0000000c  f0111308  00111308  00012308  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  7 .data.rel.local 00001000  f0112000  00112000  00013000  2**12
+                  CONTENTS, ALLOC, LOAD, DATA
+  8 .data.rel.ro.local 00000044  f0113000  00113000  00014000  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  9 .bss          00000648  f0113060  00113060  00014060  2**5
+                  CONTENTS, ALLOC, LOAD, DATA
+ 10 .comment      00000029  00000000  00000000  000146a8  2**0
+                  CONTENTS, READONLY
+SYMBOL TABLE:
+f0100000 l    d  .text	00000000 .text
+f0101a00 l    d  .rodata	00000000 .rodata
+f01020c0 l    d  .stab	00000000 .stab
+f0105c55 l    d  .stabstr	00000000 .stabstr
+f0108000 l    d  .data	00000000 .data
+f0111300 l    d  .got	00000000 .got
+f0111308 l    d  .got.plt	00000000 .got.plt
+f0112000 l    d  .data.rel.local	00000000 .data.rel.local
+f0113000 l    d  .data.rel.ro.local	00000000 .data.rel.ro.local
+f0113060 l    d  .bss	00000000 .bss
+00000000 l    d  .comment	00000000 .comment
+00000000 l    df *ABS*	00000000 obj/kern/entry.o
+f010002f l       .text	00000000 relocated
+f010003e l       .text	00000000 spin
+00000000 l    df *ABS*	00000000 entrypgdir.c
+00000000 l    df *ABS*	00000000 init.c
+00000000 l    df *ABS*	00000000 console.c
+f01001c0 l     F .text	0000001f serial_proc_data
+f01001df l     F .text	0000004b cons_intr
+f0113080 l     O .bss	00000208 cons
+f010022a l     F .text	00000132 kbd_proc_data
+f0113060 l     O .bss	00000004 shift.1338
+f0101bc0 l     O .rodata	00000100 shiftcode
+f0101ac0 l     O .rodata	00000100 togglecode
+f0113000 l     O .data.rel.ro.local	00000010 charcode
+f010035c l     F .text	00000216 cons_putc
+f0113288 l     O .bss	00000002 crt_pos
+f0113290 l     O .bss	00000004 addr_6845
+f011328c l     O .bss	00000004 crt_buf
+f0113294 l     O .bss	00000001 serial_exists
+f0111200 l     O .data	00000100 normalmap
+f0111100 l     O .data	00000100 shiftmap
+f0111000 l     O .data	00000100 ctlmap
+00000000 l    df *ABS*	00000000 monitor.c
+f0113010 l     O .data.rel.ro.local	00000018 commands
+00000000 l    df *ABS*	00000000 printf.c
+f01009f0 l     F .text	00000022 putch
+00000000 l    df *ABS*	00000000 kdebug.c
+f0100a5d l     F .text	000000f0 stab_binsearch
+00000000 l    df *ABS*	00000000 printfmt.c
+f0100d59 l     F .text	000000ca printnum
+f0100e23 l     F .text	0000001d sprintputch
+f0113028 l     O .data.rel.ro.local	0000001c error_string
+f0101292 l       .text	00000000 .L22
+f0100f34 l       .text	00000000 .L23
+f0101281 l       .text	00000000 .L25
+f0100ef3 l       .text	00000000 .L26
+f0100ebf l       .text	00000000 .L67
+f0100f1c l       .text	00000000 .L27
+f0100ec8 l       .text	00000000 .L28
+f0100ed1 l       .text	00000000 .L29
+f0100f54 l       .text	00000000 .L30
+f01010c9 l       .text	00000000 .L31
+f0100f6e l       .text	00000000 .L32
+f0100f48 l       .text	00000000 .L33
+f01011a2 l       .text	00000000 .L34
+f01011c2 l       .text	00000000 .L35
+f0100fc3 l       .text	00000000 .L36
+f0101153 l       .text	00000000 .L37
+f010122f l       .text	00000000 .L38
+00000000 l    df *ABS*	00000000 readline.c
+f01132a0 l     O .bss	00000400 buf
+00000000 l    df *ABS*	00000000 string.c
+00000000 l    df *ABS*	00000000 
+f0111308 l     O .got.plt	00000000 _GLOBAL_OFFSET_TABLE_
+f0100d55 g     F .text	00000000 .hidden __x86.get_pc_thunk.cx
+f010000c g       .text	00000000 entry
+f0101468 g     F .text	00000020 strcpy
+f010059a g     F .text	0000001d kbd_intr
+f0100883 g     F .text	0000000a mon_backtrace
+f0100106 g     F .text	0000006a _panic
+f01000a6 g     F .text	00000060 i386_init
+f01015f6 g     F .text	00000068 memmove
+f010131a g     F .text	0000001a snprintf
+f0100e5d g     F .text	0000045e vprintfmt
+f01005b7 g     F .text	0000005a cons_getc
+f0100a49 g     F .text	00000014 cprintf
+f010165e g     F .text	00000013 memcpy
+f0101334 g     F .text	000000fd readline
+f0110000 g     O .data	00001000 entry_pgtable
+f0100040 g     F .text	00000066 test_backtrace
+f01012bb g     F .text	0000005f vsnprintf
+f0113060 g       .bss	00000000 edata
+f0100611 g     F .text	00000122 cons_init
+f010075e g     F .text	00000000 .hidden __x86.get_pc_thunk.ax
+f0105c54 g       .stab	00000000 __STAB_END__
+f0105c55 g       .stabstr	00000000 __STABSTR_BEGIN__
+f01018d0 g     F .text	00000119 .hidden __umoddi3
+f0100572 g     F .text	00000028 serial_intr
+f01017b0 g     F .text	00000116 .hidden __udivdi3
+f0100754 g     F .text	0000000a iscons
+f01016c7 g     F .text	000000de strtol
+f0101449 g     F .text	0000001f strnlen
+f0101488 g     F .text	00000022 strcat
+f01136a4 g     O .bss	00000004 panicstr
+f01136a0 g       .bss	00000000 end
+f0100170 g     F .text	0000004c _warn
+f010158d g     F .text	0000001c strfind
+f01019e9 g       .text	00000000 etext
+0010000c g       .text	00000000 _start
+f01014d7 g     F .text	00000037 strlcpy
+f0101534 g     F .text	00000038 strncmp
+f01014aa g     F .text	0000002d strncpy
+f01001bc g     F .text	00000000 .hidden __x86.get_pc_thunk.bx
+f0101671 g     F .text	00000039 memcmp
+f0100733 g     F .text	00000010 cputchar
+f01015a9 g     F .text	0000004d memset
+f0100743 g     F .text	00000011 getchar
+f0100e40 g     F .text	0000001d printfmt
+f010759c g       .stabstr	00000000 __STABSTR_END__
+f010150e g     F .text	00000026 strcmp
+f0100b4d g     F .text	00000208 debuginfo_eip
+f0100a12 g     F .text	00000037 vcprintf
+f0110000 g       .data	00000000 bootstacktop
+f0112000 g     O .data.rel.local	00001000 entry_pgdir
+f0108000 g       .data	00000000 bootstack
+f01020c0 g       .stab	00000000 __STAB_BEGIN__
+f0101431 g     F .text	00000018 strlen
+f010156c g     F .text	00000021 strchr
+f01007b2 g     F .text	000000d1 mon_kerninfo
+f010088d g     F .text	00000163 monitor
+f01016aa g     F .text	0000001d memfind
+f0100762 g     F .text	00000050 mon_help
+```
+objdump输出里"Program Headers"下列出的就是程序标头。ELF对象中要被加载进内存的区域被标注为"LOAD"。每个程序标头的其他信息也一并展示了，如虚拟地址（vaddr），物理地址(paddr)和加载区域大小（memsz和filesz）。  
+回到/boot/main.c，每个程序标头的`ph->p_pa`域保存了分段的目标物理地址（在这里，它这点是一个物理地址，尽管ELF对于此域的实际意义的说明相当模糊）。  
+BIOS加载启动扇区到内存中以地址0x7c00开始的地方，故这就是启动扇区的加载地址。这也是启动扇区从哪里执行的地方，而且也是它的链接地址。通过添加`-Ttext 0x7c00`到boot/Makefrag里的链接器来设置链接地址，使得链接器在生成码中能产生正确的内存地址。  
+#### Exercise 5
+Lab下`make clean`清除编译，修改链接地址，再make重新编译，再次跟踪启动加载器的头几个指令，找到修改链接地址后第一条出错的指令，看看会发生什么。最后改回原来的链接地址重新编译。  
+  
+目光回到内核的加载和链接地址。不像启动加载器，这两个地址是不同的：内核告诉启动加载器把它加载到内存中的低地址（1兆字节），但它因该从一个高地址被执行。下一节深入如何使其奏效。  
+除了分段信息，对我们来说ELF标头中还有一个很重要的域e_entry。这个域保存了程序的进入指针的链接地址，即程序因该从哪里开始执行的程序文本分段内存地址。  
+检查进入指针`objdump -f obj/kern/kernel`  
+输出  
+```
+obj/kern/kernel:     file format elf32-i386
+architecture: i386, flags 0x00000112:
+EXEC_P, HAS_SYMS, D_PAGED
+start address 0x0010000c
+```
+现在因该有能力明白boot/main.c中最简单的ELF标头。它从硬盘中读取每个内核分段到内存中的加载地址，然后跳转到内核的进入指针地址。  
+#### Exercise 6
+可以使用GDB的-x指令来检查内存。这里了解`x/Nx ADDR`打印ADDR地址后N个字的内存，注意-x小写。警告，一个字的大小不是统一标准。在GNU汇编中，一个字是两字节（xorw中的w代表word,意味着两字节）。  
+重置机器，退出QEMU/GDB再重启。检查内存中0x0010 0000后8个字的内容，一次在BIOS进入启动加载器时，另一次在启动加载器进入内核时。看看发生了什么。  
+  
+断点设置  
+`b *0x7c00`  
+`b *0x7d6b`  
+第一次检查  
+```  
+0x100000:	0x00000000	0x00000000	0x00000000	0x00000000
+0x100010:	0x00000000	0x00000000	0x00000000	0x00000000
+```
+第二次检查
+```
+0x100000:	0x1badb002	0x00000000	0xe4524ffe	0x7205c766
+0x100010:	0x34000004	0x2000b812	0x220f0011	0xc0200fd8
+```
