@@ -2,8 +2,8 @@
 ## Part a. PC Bootstrap 计算机启动引导程序  
 这一部分实验不需要写代码，	而要求熟悉x86汇编。  
 课程推荐了一系列整个6.828会涉及到的[读物](https://pdos.csail.mit.edu/6.828/2018/reference.html)作为参考，在Lab1里还为不熟悉汇编语言的人推荐了[PC Assembly Language Book](https://pdos.csail.mit.edu/6.828/2018/readings/pcasm-book.pdf)。值得一提的是，这本指导书中的例子是以Intel语法风格为NASM汇编器写的，而我们用到的GNU汇编器用到的代码是以AT&T语法风格写的。两种语法风格的简单转换参见[Brennan's Guide to Inline Assembly](http://www.delorie.com/djgpp/doc/brennan/brennan_att_inline_djgpp.html)。  
-#### Exercise 1 
-熟悉参考读物里关于汇编语言的部分，推荐搭配阅读两种语法风格转换的文章。  
+> + Exercise 1 
+    熟悉参考读物里关于汇编语言的部分，推荐搭配阅读两种语法风格转换的文章。  
 ### x86系统模拟
 JOS下QEMU的启动参照Tools.md部分。  
 ```
@@ -138,8 +138,8 @@ The target architecture is assumed to be i8086
 ```
 0xffff0是BIOS末尾（0x100000）之前的16字节。因此我们不该意外BIOS做的第一件事是向后jmp到一个BIOS中的更早的位置来获得更大的空间。  
   
-#### Exercise 2
-使用GDB的si单步调试命令跟踪ROM BIOS的一些指令，推测这些指令在做什么。推荐查阅[Phil Storrs I/O Ports Description](http://web.archive.org/web/20040404164813/members.iweb.net.au/~pstorr/pcbook/book2/book2.htm)。不需要完全查清细节，只要大体明白BIOS一开始在做什么。  
+> + Exercise 2
+    使用GDB的si单步调试命令跟踪ROM BIOS的一些指令，推测这些指令在做什么。推荐查阅[Phil Storrs I/O Ports Description](http://web.archive.org/web/20040404164813/members.iweb.net.au/~pstorr/pcbook/book2/book2.htm)。不需要完全查清细节，只要大体明白BIOS一开始在做什么。  
   
   
 BIOS启动后首先会检查物理设备，即Power-On Self-Test，此时只对CPU各项寄存器检查，判断是否满足计算机运行的基本条件，如果此阶段出现故障一般会通过主板蜂鸣器发出规律的报警声。无意外发生时之后BIOS会对所有计算机硬件初始化，为操作系统管理和硬件调配做准备。BIOS第一个初始化的硬件是显卡，将后续初始化硬件信息打印在显示器上，如果有，提示硬件初始化时可能发生的问题。  
