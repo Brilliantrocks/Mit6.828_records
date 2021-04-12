@@ -383,7 +383,7 @@ JOS把处理器32位线性地址空间分为两部分。用户环境（线程,�
   
 3.避免用户程序改写内核内存导致操作系统崩溃和隐患。通过分页和许可位来限制用户只读部分内核内存空间，拒绝用户访问其他内核内存。  
   
-4.目前能够被页表结构管理的内存被页表信息结构存储大小限制，总的pages数组存储大小上限为一个PTSIZE＝PGSIZE * NPTENTRIES 即页目录记录所能映射的内存大小，而每个PageInfo结构大小为8字节，则能够存放4096 * 1024/8=512K个页表，故最大能够支持512 * 4096=2GB的内存空间。
+4..最大寻址空间为页目录记录上限 * 页表记录上限 * 页大小为1024 * 1024 * 4096B = 4GB,然而在达到最大寻址之前内存管理被页信息的存储大小限制了。为pages数组分配的存储大小上限为一个PTSIZE＝PGSIZE * NPTENTRIES 即一个页目录记录所能映射的内存大小，而每个PageInfo结构大小为8字节，则能够存放4096 * 1024/8=512K个页表，故最大能够支持512 * 4096=2GB的内存空间。
   
 5.最大支持物理内存时存放PageInfo信息的pages数组占据一个PTSZIE,kern_page分配了一页的内存，存放所有页地址需要512K个地址大小的空间，综合大小为4096B * 1024 + 4096B + 512 * 1024 * 4B = 6MB + 4KB。   
   
@@ -394,8 +394,33 @@ JOS把处理器32位线性地址空间分为两部分。用户环境（线程,�
   
 PSE标志位在CR4的第四位控制启用。  
 PSE标志位使能了大页尺寸：4MB字节页或2MB字节页（在设置了PAE物理地址扩展位时）。当PSE位空时，使用通常的4KB大小页。  
-4MB页的线性地址转换：![大页地址转换](https://user-images.githubusercontent.com/75117698/114344311-2a2c2a00-9b92-11eb-971d-dc1eb25908eb.png)
-  
+4MB页的线性地址转换：![大页地址转换](https://user-images.githubusercontent.com/75117698/114344311-2a2c2a00-9b92-11eb-971d-dc1eb25908eb.png)  
+页目录记录指向物理内存的4MB页。这种映射方法可以映射多达1024页到4GB的线性地址空间。 
+通过CR4启用PSE并在页目录记录中启用PTE_PS位来选择大页尺寸。这些标志位设置后，线性地址被分为两段：  
+页目录记录--22到32bit位提供页目录记录的偏移量。选定的记录提供了4MB页的物理基地址。  
+页偏移--0到21bit位提供了物理地址在页中的偏移量。  
+在/kern/entry.s中开启分页功能前开启PSE位  
+```
+    // Enable page size extension
+    cr4 = rcr4();
+    cr4 |= CR4_PSE;
+    lcr4(cr4);
+```
+在pmap.c中完成大页映射机制  
+```
+static void 
+boot_map_region_huge_page(pde_t* pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm) 
+{
+	size_t off;
+ 
+	if (va & (PTSIZE - 1) || pa & (PTSIZE - 1) || size & (PTSIZE - 1))
+		panic("boot_map_region_huge_page");
+	
+	for (off = 0; off < size; off += PTSIZE) {
+		pgdir[PDX(va + off)] = (pa + off) | perm | PTE_P | PTE_PS;
+	}
+}
+```  
 ### 其他地址空间布局
 JOS使用的地址空间布局只是可能的的一个。一个操作系统可以映射内核到低位线性地址而把高位线性地址空间留给用户进程。x86内核总体上不采用这个路线，然而，因为x86的一个前向兼容模式，虚拟8086模式，时硬件绑定在处理器里使用底部的线性空间，这导致当内核映射在这里时将完全无法使用这一模式。  
   
