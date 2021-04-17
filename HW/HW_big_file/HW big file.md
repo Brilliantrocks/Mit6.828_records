@@ -24,7 +24,8 @@ mkfs初始化文件系统，有着比1000更少的可用数据区块，太少以
   
 ##要看什么
   
-硬盘节点的格式定义在fs.h的dinode结构里。尤其注意其中的NDIRECT, NINDIRECT, MAXFILE,和the addrs[]元素。结构如图：  
+硬盘节点的格式定义在fs.h的dinode结构里。尤其注意其中的NDIRECT, NINDIRECT, MAXFILE,和the addrs[]元素。结构如图：  ![dinode结构](https://user-images.githubusercontent.com/75117698/115114304-27ca3580-9fc1-11eb-9e23-a947139d85f6.png)
+
   
 查找硬盘上数据的代码在fs.c的bmap()里。通读它确保自己理解它做了什么。读写文件时都会调用bmap()。当写入时，bmap()分配新区块来存放文件内容，在有需要时分配一个间接区块来保存区块地址。  
   
@@ -55,7 +56,8 @@ bmap()处理两种区块数。bn参数时逻辑区块--一个关于文件起始�
 只在需要时分配间接区块和双重间接区块，就像原版的bmap()一样。  
   
 新关系图为  
-  
+  ![dinode改](https://user-images.githubusercontent.com/75117698/115114310-2f89da00-9fc1-11eb-8dee-4cc496c51243.png)
+
 
 修改fs.h,NDIRECT减一:  
   
