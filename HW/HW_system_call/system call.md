@@ -1,4 +1,4 @@
-#Homework XV6 system call
+# Homework XV6 system call
 ## Part a:系统调用追踪 
   
 第一个任务是修改xv6内核来为每个系统调用请求打印一行信息。一行足够打印系统调用名称和返回值；不需要打印系统调用参数。  
