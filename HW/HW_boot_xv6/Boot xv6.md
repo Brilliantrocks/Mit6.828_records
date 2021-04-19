@@ -1,11 +1,11 @@
-#Homework: boot xv6
-##启动xv6
+# Homework: boot xv6
+## 启动xv6
 获取xv-6。
 `$ git clone git://github.com/mit-pdos/xv6-public.git`  
 `cd xv6-public`    
 `make`  
   
-##找到并设置地址断点  
+## 找到并设置地址断点  
 找到内核进入指针_start:
 ` nm kernel | grep _start`  
 得到输出  
