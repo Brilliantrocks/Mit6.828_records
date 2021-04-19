@@ -1,4 +1,4 @@
-#HW Threads and Locking
+# HW Threads and Locking
 本节需要通过一个哈希表用线程和锁探索并行编程。需要在一个有多核的真实计算机上进行。  
   
 下载[ph.c](https://pdos.csail.mit.edu/6.828/2018/homework/ph.c)并在自己的计算机上编译而不需要6.828提供的工具。   
