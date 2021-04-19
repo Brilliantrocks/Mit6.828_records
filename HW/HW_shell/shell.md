@@ -1,4 +1,4 @@
-#Homework:shell
+# Homework:shell
 这次的任务是通过实现小型shell的几个功能熟悉Unix系统调用交互和shell。可以在任一支持Unix API的操作系统来完成这个任务。  
   
 阅读[XV6_book]（https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev10.pdf）的第零章。    
