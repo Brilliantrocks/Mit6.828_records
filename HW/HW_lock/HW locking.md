@@ -1,8 +1,8 @@
-#Homework: locking
+# Homework: locking
   
 本节将探索中断和锁的交互。  
   
-##不要这么做
+## 不要这么做
   
 确认理解如果xv6内核执行下面的代码会发生什么：  
 ```
@@ -17,7 +17,7 @@
   
 在第一条acquire请求锁后紧接着再次发起了acquire请求，在acquire的实现中当重复请求锁时会报错。  
   
-##ide.c中的中断
+## ide.c中的中断
   
 一个acquire确保中断在局部处理器通过pushcli()用cli指令时被停用，并让中断保持关闭直到那个处理器释放最后一个持有的锁（用sti指令启用）。  
   
@@ -45,7 +45,7 @@ kernel.asm的记录
 在acquire后启用中断，程序接受了中断并进入ideintr()中，在这个函数里又一次调用acquire请求锁，故报错。  
   
   
-###file.c中的中断  
+### file.c中的中断  
   
 移除上面的测试用sti()和cli()，重新build内核，确认它能正确工作。  
   
