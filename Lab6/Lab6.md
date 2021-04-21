@@ -1013,6 +1013,9 @@ send_data(struct http_request *req, int fd)
 `Local port 25002 forwards to JOS port 80 (web server)`  
   
 远程访问主机服务器：http://xxx.xxx.xxx.xxx:25002/index.html  
+![JOSweb](https://user-images.githubusercontent.com/75117698/115610775-e5378e80-a31b-11eb-8db6-5377930ee2d6.gif)
+
+
   
 make grade得分105/105。
 
