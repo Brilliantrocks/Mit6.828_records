@@ -7,6 +7,9 @@ OS操作系统开发学习
 操作系统 Ubuntu Server 18304.1 LTS 64bit 1核 cpu 2GB 内存  
 Xshell7 SSH远程操作
 Xmanager7 图形界面支持  
+具体配置流程见Tools
+ 
+本项目包含课题最终完成代码，与各个lab和作业的笔记。  
 
 ## Lab1 
   
