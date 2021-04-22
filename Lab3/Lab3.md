@@ -263,7 +263,7 @@ env_run(struct Env *e)
 
     env_pop_tf(&curenv->env_tf);
 
-	panic("env_run not yet implemented");
+	//panic("env_run not yet implemented");
 }
 ```
 
@@ -494,29 +494,28 @@ trap_init(void)
 > + challenge
     现在代码可能有大量相似的地方，具体来说在表TRAPHANDLER和trap.c中的初始化。整理这些代码，改变trapentry.S的宏来自动生成一个表让trap.c来使用。注意使用伪指令.text和.data来在汇编器里切换底层代码和数据。
   
-宏TRAPHANDLER修改：  
+宏TRAPHANDLER修改（宏中注意末尾空格）：  
 ```
- /* ec位表示是否传入错误码,user提示是否为系统调用
-#define TRAPHANDLER(name, num，ec,user)	
-.text;					\
+#define TRAPHANDLER(name, num, ec, user)				\
+.text;									\
 	.globl name;		/* define global symbol for 'name' */	\
 	.type name, @function;	/* symbol type is function */		\
 	.align 2;		/* align function definition */		\
 	name:			/* function starts here */		\
-	        .if ec==0;                                                      \
-                pushl $0;  
-			.endif;
+	.if ec==0;							\
+		pushl $0;						\
+	.endif;								\
 	pushl $(num);							\
-	jmp _alltraps
-.data;
-    .long  name, num, user
+	jmp _alltraps;							\
+.data;									\
+	.long  name, num, user	
 ```
   
 定义并填充全局数组：  
 ```
-data
-        .globl  entry_data
-        entry_data:
+.data
+	.globl  entry_data
+	entry_data:
 .text
 TRAPHANDLER(divide_entry, T_DIVIDE, 0, 0);
 TRAPHANDLER(debug_entry, T_DEBUG, 0, 0);
@@ -525,7 +524,7 @@ TRAPHANDLER(brkpt_entry, T_BRKPT, 0, 1);
 TRAPHANDLER(oflow_entry, T_OFLOW, 0, 0);
 TRAPHANDLER(bound_entry, T_BOUND, 0, 0);
 TRAPHANDLER(illop_entry, T_ILLOP, 0, 0);
-TRAPHANDLER(device_entry, T_DEVICE, 0, 0);      
+TRAPHANDLER(device_entry, T_DEVICE, 0, 0);	
 TRAPHANDLER(dblflt_entry, T_DBLFLT, 1, 0);
 TRAPHANDLER(tts_entry, T_TSS, 1, 0);
 TRAPHANDLER(segnp_entry, T_SEGNP, 1, 0);
@@ -538,7 +537,7 @@ TRAPHANDLER(mchk_entry, T_MCHK, 0, 0);
 TRAPHANDLER(simderr_entry, T_SIMDERR, 0, 0);
 TRAPHANDLER(syscall_entry, T_SYSCALL, 0, 1);
 .data
-        .long 0, 0, 0
+	.long 0, 0, 0   // interupt end identify
 ```  
 利用全局数组进行初始化
 ```
@@ -666,6 +665,7 @@ trap_init（）中由之前的实现自动初始化
 trap_dispatch()的switch中添加系统调用case  
   
 ```
+	int32_t ret_code;
     case (T_SYSCALL):
     //传入tf寄存器的值作为参数
         ret_code = syscall(
