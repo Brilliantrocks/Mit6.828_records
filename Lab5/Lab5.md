@@ -449,7 +449,7 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 实现spawn而不是一个UNIX风格得exec是因为spawn更容易从用户空间以外核风格实现，而不用内核的协助。思考为了实现用户空间的exec需要做什么，确保理解为什么它更难。  
   
 > + Exercise7
-	spawn依赖于新系统调用sys_env_set_trapframe来初始化新建的环境状态。实现kern/syscall.c里的kern/syscall.c。（不要忘记在syscall()分发新系统调用)。
+	spawn依赖于新系统调用sys_env_set_trapframe来初始化新建的环境状态。实现kern/syscall.c里的sys_env_set_trapframe。（不要忘记在syscall()分发新系统调用)。
 	测试代码，从kern/init.c运行user/spawnhello，它尝试从文件系统spawn /hello。
 	也用make grade 测试。  
   
